@@ -1,5 +1,3 @@
-// D:\vs\go\fanucService\focas\parameter.go
-
 package focas
 
 import (
@@ -19,18 +17,17 @@ import "C"
 
 const (
 	paramPartsCount    = 6711 // Количество обработанных деталей
-	paramPowerOnTime   = 6750 // Время включения
-	paramOperatingTime = 6751 // Время работы
-	paramCuttingTime   = 6753 // Время резания
-	paramCycleTime     = 6757 // Время цикла
+	paramPowerOnTime   = 6750 // Время включения (в минутах)
+	paramOperatingTime = 6751 // Время работы (в миллисекундах)
+	paramCuttingTime   = 6753 // Время резания (в миллисекундах)
+	paramCycleTime     = 6757 // Время цикла (в миллисекундах)
 )
 
 // formatDuration форматирует time.Duration в строку "HH:MM:SS".
 func formatDuration(d time.Duration) string {
-	totalSeconds := int64(d.Seconds())
-	h := totalSeconds / 3600
-	m := (totalSeconds % 3600) / 60
-	s := totalSeconds % 60
+	h := int64(d.Hours())
+	m := int64(d.Minutes()) % 60
+	s := int64(d.Seconds()) % 60
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
@@ -77,51 +74,51 @@ func (a *FocasAdapter) ReadParameterInfo() (*models.ParameterInfo, error) {
 		info.PartsCount = int64(partsCount)
 	}
 
-	// Чтение времени включения
-	powerOnSeconds, err := a.readParameterLong(paramPowerOnTime)
+	// Чтение времени включения (в минутах)
+	powerOnMinutes, err := a.readParameterLong(paramPowerOnTime)
 	if err != nil {
 		log.Printf("Warning: не удалось прочитать время включения (параметр %d): %v", paramPowerOnTime, err)
 		if firstErr == nil {
 			firstErr = err
 		}
 	} else {
-		duration := time.Duration(powerOnSeconds) * time.Second
+		duration := time.Duration(powerOnMinutes) * time.Minute
 		info.PowerOnTime = formatDuration(duration)
 	}
 
-	// Чтение времени работы
-	operatingSeconds, err := a.readParameterLong(paramOperatingTime)
+	// Чтение времени работы (в миллисекундах)
+	operatingMillis, err := a.readParameterLong(paramOperatingTime)
 	if err != nil {
 		log.Printf("Warning: не удалось прочитать время работы (параметр %d): %v", paramOperatingTime, err)
 		if firstErr == nil {
 			firstErr = err
 		}
 	} else {
-		duration := time.Duration(operatingSeconds) * time.Second
+		duration := time.Duration(operatingMillis) * time.Millisecond
 		info.OperatingTime = formatDuration(duration)
 	}
 
-	// Чтение времени резания
-	cuttingSeconds, err := a.readParameterLong(paramCuttingTime)
+	// Чтение времени резания (в миллисекундах)
+	cuttingMillis, err := a.readParameterLong(paramCuttingTime)
 	if err != nil {
 		log.Printf("Warning: не удалось прочитать время резания (параметр %d): %v", paramCuttingTime, err)
 		if firstErr == nil {
 			firstErr = err
 		}
 	} else {
-		duration := time.Duration(cuttingSeconds) * time.Second
+		duration := time.Duration(cuttingMillis) * time.Millisecond
 		info.CuttingTime = formatDuration(duration)
 	}
 
-	// Чтение времени цикла
-	cycleSeconds, err := a.readParameterLong(paramCycleTime)
+	// Чтение времени цикла (в миллисекундах)
+	cycleMillis, err := a.readParameterLong(paramCycleTime)
 	if err != nil {
 		log.Printf("Warning: не удалось прочитать время цикла (параметр %d): %v", paramCycleTime, err)
 		if firstErr == nil {
 			firstErr = err
 		}
 	} else {
-		duration := time.Duration(cycleSeconds) * time.Second
+		duration := time.Duration(cycleMillis) * time.Millisecond
 		info.CycleTime = formatDuration(duration)
 	}
 
