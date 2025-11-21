@@ -1,4 +1,4 @@
-package main
+package fanucService
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ func main() {
 		IP:          "192.168.56.1",
 		Port:        8193,
 		TimeoutMs:   5000,
-		ModelSeries: "30i",
+		ModelSeries: "0i",
 		LogPath:     "./focas.log",
 	}
 
