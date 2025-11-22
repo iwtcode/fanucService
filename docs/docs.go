@@ -141,6 +141,10 @@ const docTemplate = `{
                     "description": "ip:port",
                     "type": "string"
                 },
+                "model": {
+                    "description": "Model name",
+                    "type": "string"
+                },
                 "series": {
                     "description": "\"0i\", \"31i\", etc",
                     "type": "string"

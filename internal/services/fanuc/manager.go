@@ -18,6 +18,8 @@ import (
 const (
 	// HardConnectionTimeout задает жесткий лимит времени на любую попытку подключения.
 	HardConnectionTimeout = 5 * time.Second
+	DefaultTimeout        = 5000
+	DefaultUnknown        = "Unknown"
 )
 
 type Service struct {
@@ -89,38 +91,53 @@ func (s *Service) CreateConnection(ctx context.Context, req fanucService.Connect
 		return nil, fmt.Errorf("connection to %s already exists with ID %s", req.Endpoint, existing.ID)
 	}
 
-	// 2. Парсинг адреса
+	// 2. Применение значений по умолчанию
+	series := req.Series
+	if series == "" {
+		series = DefaultUnknown
+	}
+
+	model := req.Model
+	if model == "" {
+		model = DefaultUnknown
+	}
+
+	timeout := req.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	// Ограничиваем таймаут сверху константой хард-таймаута (5000мс), чтобы не блокировать горутины надолго
+	if timeout > int(HardConnectionTimeout.Milliseconds()) {
+		timeout = int(HardConnectionTimeout.Milliseconds())
+	}
+
+	// 3. Парсинг адреса
 	ip, port, err := parseEndpoint(req.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid endpoint format: %w", err)
 	}
 
-	// Ограничение таймаута
-	libTimeout := req.Timeout
-	if libTimeout <= 0 || libTimeout > int(HardConnectionTimeout.Milliseconds()) {
-		libTimeout = int(HardConnectionTimeout.Milliseconds())
-	}
-
 	adapterCfg := &adapter.Config{
 		IP:          ip,
 		Port:        port,
-		TimeoutMs:   int32(libTimeout),
-		ModelSeries: req.Series,
+		TimeoutMs:   int32(timeout),
+		ModelSeries: series,
 		LogPath:     "./focas.log",
 	}
 
-	// 3. Подключение
+	// 4. Подключение
 	client, err := s.connectWithTimeout(adapterCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to machine: %w", err)
 	}
 
-	// 4. Сохранение в БД
+	// 5. Сохранение в БД
 	machine := &entities.Machine{
 		ID:        uuid.New().String(),
 		Endpoint:  req.Endpoint,
-		Series:    req.Series,
-		Timeout:   libTimeout,
+		Timeout:   timeout,
+		Model:     model,
+		Series:    series,
 		Status:    entities.StatusConnected,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -131,7 +148,7 @@ func (s *Service) CreateConnection(ctx context.Context, req fanucService.Connect
 		return nil, fmt.Errorf("failed to save machine to db: %w", err)
 	}
 
-	// 5. Сохранение в пул
+	// 6. Сохранение в пул
 	s.clients.Store(machine.ID, client)
 
 	return machine, nil
@@ -219,8 +236,6 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 	}
 
 	// 3. Проверка здоровья.
-	// ИЗМЕНЕНИЕ: Убрана проверка GetSystemInfo() (кэш).
-	// Теперь мы всегда делаем реальный вызов GetMachineState.
 	checkErrChan := make(chan error, 1)
 	go func() {
 		// GetMachineState делает вызов cnc_statinfo, который идет по сети.
