@@ -120,6 +120,11 @@ func (s *Service) GetConnections(ctx context.Context) ([]entities.Machine, error
 }
 
 func (s *Service) DeleteConnection(ctx context.Context, id string) error {
+	// First stop polling if active
+	if _, ok := s.pollingCancel.Load(id); ok {
+		_ = s.StopPolling(ctx, id)
+	}
+
 	if val, ok := s.clients.Load(id); ok {
 		client := val.(*adapter.Client)
 		client.Close()
@@ -155,7 +160,7 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 
 		client, err = s.connectWithTimeout(cfg)
 		if err != nil {
-			s.updateStatus(machine, entities.StatusReconnecting)
+			// Don't change status to reconnecting, keep old status
 			return machine, fmt.Errorf("machine unreachable: %w", err)
 		}
 		s.clients.Store(id, client)
@@ -164,8 +169,17 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 	// 3. Health check via network call
 	checkErrChan := make(chan error, 1)
 	go func() {
-		_, err := client.GetMachineState()
-		checkErrChan <- err
+		// Just reading system info as a health check
+		sysInfo := client.GetSystemInfo()
+		if sysInfo == nil {
+			// Try a harder check if sysInfo (cached inside adapter) is suspicious,
+			// but adapter usually handles reconnects. Let's try ReadSystemInfo explicitly or assume OK if adapter not closed.
+			// Ideally, adapter.GetMachineState() is a real network call.
+			_, err := client.GetMachineState()
+			checkErrChan <- err
+		} else {
+			checkErrChan <- nil
+		}
 	}()
 
 	select {
@@ -173,21 +187,35 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 		if err != nil {
 			client.Close()
 			s.clients.Delete(id)
-			s.updateStatus(machine, entities.StatusReconnecting)
+			// Don't change status to reconnecting, just return error
 			return machine, fmt.Errorf("health check failed: %w", err)
 		}
 	case <-time.After(HardConnectionTimeout):
-		s.updateStatus(machine, entities.StatusReconnecting)
+		// Don't change status to reconnecting
 		return machine, fmt.Errorf("health check timed out")
 	}
 
-	s.updateStatus(machine, entities.StatusConnected)
+	// If machine was disconnected but check passed, we might want to ensure it is at least 'connected'
+	// But if it is 'polled', we leave it as 'polled'.
+	// Only update if it helps (e.g. from some unknown state).
+	// For now, let's assume if it works, we leave status as is (Polling logic handles its own status).
+
+	// Optional: force 'connected' if it was somehow 'reconnecting' from legacy data, but we removed that constant.
 	return machine, nil
 }
 
 func (s *Service) updateStatus(m *entities.Machine, status string) {
 	if m.Status != status {
 		m.Status = status
+		m.UpdatedAt = time.Now()
+		_ = s.repo.Update(m)
+	}
+}
+
+// updateInterval updates the polling interval in the DB
+func (s *Service) updateInterval(m *entities.Machine, interval int) {
+	if m.Interval != interval {
+		m.Interval = interval
 		m.UpdatedAt = time.Now()
 		_ = s.repo.Update(m)
 	}

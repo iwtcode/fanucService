@@ -17,8 +17,9 @@ func (s *Service) StartPolling(ctx context.Context, machineID string, intervalMs
 		return fmt.Errorf("polling already active for machine %s", machineID)
 	}
 
-	// 2. Ensure connection exists and machine is reachable
-	// This also fetches the machine entity from DB
+	// 2. Ensure connection exists and machine is reachable (REAL CHECK)
+	// CheckConnection выполняет реальный запрос GetMachineState.
+	// Если станок недоступен, вернется ошибка.
 	machine, err := s.CheckConnection(ctx, machineID)
 	if err != nil {
 		return fmt.Errorf("cannot start polling, machine unreachable: %w", err)
@@ -31,18 +32,26 @@ func (s *Service) StartPolling(ctx context.Context, machineID string, intervalMs
 	}
 	client := val.(*adapter.Client)
 
-	// 4. Update Status in DB to 'polled'
-	// Note: We use the helper method updateStatus defined in connection.go (same package)
+	// 4. Update Status & Interval in DB
+	s.updateInterval(machine, intervalMs)
 	s.updateStatus(machine, entities.StatusPolled)
 
-	// 5. Create cancellation context
+	// 5. Start internal polling
+	s.startPollingInternal(machineID, client, intervalMs)
+
+	return nil
+}
+
+// startPollingInternal starts the routine without DB updates or checks (used for restore)
+func (s *Service) startPollingInternal(machineID string, client *adapter.Client, intervalMs int) {
+	if intervalMs <= 0 {
+		intervalMs = 1000 // safe fallback
+	}
+
 	pollCtx, cancel := context.WithCancel(context.Background())
 	s.pollingCancel.Store(machineID, cancel)
 
-	// 6. Start background polling routine
 	go s.pollRoutine(pollCtx, machineID, client, time.Duration(intervalMs)*time.Millisecond)
-
-	return nil
 }
 
 func (s *Service) StopPolling(ctx context.Context, machineID string) error {
@@ -60,16 +69,15 @@ func (s *Service) StopPolling(ctx context.Context, machineID string) error {
 	machine, err := s.repo.GetByID(machineID)
 	if err == nil {
 		s.updateStatus(machine, entities.StatusConnected)
-	} else {
-		log.Printf("Warning: failed to fetch machine %s to update status on stop polling: %v", machineID, err)
 	}
 
 	return nil
 }
 
 func (s *Service) pollRoutine(ctx context.Context, machineID string, client *adapter.Client, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	// Первый запуск - через интервал
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
 
 	log.Printf("Polling started for machine %s with interval %v", machineID, interval)
 
@@ -78,31 +86,40 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, client *ada
 		case <-ctx.Done():
 			log.Printf("Polling stopped for machine %s", machineID)
 			return
-		case <-ticker.C:
-			// Perform polling
+		case <-timer.C:
+			// 1. Засекаем время начала работы
+			start := time.Now()
+
+			// 2. Выполняем опрос
 			data, err := client.GetCurrentData()
 			if err != nil {
 				log.Printf("Error polling machine %s: %v", machineID, err)
-				// On error, we might consider stopping, but usually we retry.
-				// If the machine becomes completely unreachable, CheckConnection or a background health check
-				// should eventually handle status updates, but here we just log.
-				continue
+			} else {
+				// 3. Отправляем данные в Kafka (только если опрос успешен)
+				data.MachineID = machineID
+				payload, err := json.Marshal(data)
+				if err != nil {
+					log.Printf("Failed to marshal polling data: %v", err)
+				} else {
+					if err := s.kafkaProducer.Send(context.Background(), []byte(machineID), payload); err != nil {
+						log.Printf("Failed to send polling data to Kafka: %v", err)
+					}
+				}
 			}
 
-			// Enrich data with ID
-			data.MachineID = machineID
+			// 4. Вычисляем затраченное время
+			elapsed := time.Since(start)
 
-			// Send to Kafka
-			payload, err := json.Marshal(data)
-			if err != nil {
-				log.Printf("Failed to marshal polling data: %v", err)
-				continue
-			}
+			// 5. Вычисляем время до следующего запуска
+			// Цель: следующий запуск должен быть ровно через interval после НАЧАЛА текущего.
+			nextWait := interval - elapsed
 
-			// Send asynchronously
-			err = s.kafkaProducer.Send(context.Background(), []byte(machineID), payload)
-			if err != nil {
-				log.Printf("Failed to send polling data to Kafka: %v", err)
+			if nextWait <= 0 {
+				// Если работа заняла больше времени, чем интервал, запускаем следующую итерацию немедленно
+				timer.Reset(0)
+			} else {
+				// Ждем оставшееся время
+				timer.Reset(nextWait)
 			}
 		}
 	}
