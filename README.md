@@ -1,7 +1,7 @@
 # fanucService
 
 ```bash
-go run main.go
+go run cmd/app/main.go
 ```
 
 ```
