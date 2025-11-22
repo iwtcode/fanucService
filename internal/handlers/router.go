@@ -3,7 +3,7 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/iwtcode/fanucService"
-	_ "github.com/iwtcode/fanucService/docs" // Import docs
+	_ "github.com/iwtcode/fanucService/docs"
 	"github.com/iwtcode/fanucService/internal/middleware"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"

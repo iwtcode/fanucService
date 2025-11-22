@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	adapter "github.com/iwtcode/fanucAdapter"
+	"github.com/iwtcode/fanucService/internal/interfaces"
 )
 
 const (
@@ -17,10 +19,21 @@ const (
 	DefaultUnknown        = "Unknown"
 )
 
+type Service struct {
+	repo    interfaces.Repository
+	clients sync.Map // map[string]*adapter.Client (Key: Machine ID)
+}
+
 // connectResult is used to pass results from goroutines
 type connectResult struct {
 	client *adapter.Client
 	err    error
+}
+
+func NewService(repo interfaces.Repository) interfaces.FanucService {
+	return &Service{
+		repo: repo,
+	}
 }
 
 // Helper to parse "ip:port"
