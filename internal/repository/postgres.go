@@ -51,7 +51,7 @@ func NewRepository(cfg *fanucService.Config) (interfaces.Repository, error) {
 		return nil, fmt.Errorf("failed to connect to application db: %w", err)
 	}
 
-	// Auto Migrate
+	// 3. Auto Migrate
 	if err := db.AutoMigrate(&entities.Machine{}); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}

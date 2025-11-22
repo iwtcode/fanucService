@@ -26,7 +26,6 @@ type Service struct {
 	pollingCancel sync.Map // map[string]context.CancelFunc (Key: Machine ID)
 }
 
-// connectResult is used to pass results from goroutines
 type connectResult struct {
 	client *adapter.Client
 	err    error
@@ -39,7 +38,6 @@ func NewService(repo interfaces.Repository, producer *kafka.Producer) interfaces
 	}
 }
 
-// Helper to parse "ip:port"
 func parseEndpoint(endpoint string) (string, uint16, error) {
 	host, portStr, err := net.SplitHostPort(endpoint)
 	if err != nil {
@@ -52,7 +50,6 @@ func parseEndpoint(endpoint string) (string, uint16, error) {
 	return host, uint16(port), nil
 }
 
-// connectWithTimeout executes FOCAS connection in a separate goroutine with a hard timeout
 func (s *Service) connectWithTimeout(cfg *adapter.Config) (*adapter.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), HardConnectionTimeout)
 	defer cancel()
@@ -62,7 +59,6 @@ func (s *Service) connectWithTimeout(cfg *adapter.Config) (*adapter.Client, erro
 	go func() {
 		client, err := adapter.New(cfg)
 
-		// If context expired, close connection immediately
 		if ctx.Err() != nil {
 			if client != nil {
 				client.Close()

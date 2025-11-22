@@ -89,7 +89,6 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 				continue
 			}
 
-			// Если клиент получен, обновляем статус на Connected (если был reconnecting)
 			if m, dbErr := s.repo.GetByID(machineID); dbErr == nil && m.Status == entities.StatusReconnecting {
 				s.updateStatus(m, entities.StatusConnected)
 			}

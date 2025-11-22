@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -95,5 +96,6 @@ func (h *ConnectionHandler) Delete(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	RespondSuccess(c, "deleted")
+
+	RespondMessage(c, fmt.Sprintf("session %s successfully deleted", id))
 }

@@ -41,16 +41,13 @@ func (s *Service) checkOneOnce(machine entities.Machine) {
 		ModelSeries: machine.Series,
 	}
 
-	// Attempt connection
 	client, err := s.connectWithTimeout(cfg)
 
 	if err == nil {
-		// Connection Successful
 		s.clients.Store(machine.ID, client)
 		log.Printf("Restored connection to %s (Static mode)", machine.Endpoint)
 		s.updateStatus(&machine, entities.StatusConnected)
 	} else {
-		// Connection Failed
 		log.Printf("Machine %s (Static mode) is unreachable: %v", machine.Endpoint, err)
 		s.updateStatus(&machine, entities.StatusReconnecting)
 	}
