@@ -13,4 +13,8 @@ type FanucService interface {
 	DeleteConnection(ctx context.Context, id string) error
 	CheckConnection(ctx context.Context, id string) (*entities.Machine, error)
 	RestoreConnections() error
+
+	// Polling methods
+	StartPolling(ctx context.Context, machineID string, intervalMs int) error
+	StopPolling(ctx context.Context, machineID string) error
 }

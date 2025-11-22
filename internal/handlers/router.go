@@ -9,7 +9,11 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func NewRouter(cfg *fanucService.Config, connHandler *ConnectionHandler) *gin.Engine {
+func NewRouter(
+	cfg *fanucService.Config,
+	connHandler *ConnectionHandler,
+	pollHandler *PollingHandler,
+) *gin.Engine {
 	gin.SetMode(cfg.App.GinMode)
 	r := gin.Default()
 
@@ -25,6 +29,12 @@ func NewRouter(cfg *fanucService.Config, connHandler *ConnectionHandler) *gin.En
 			connect.POST("", connHandler.Create)
 			connect.GET("", connHandler.Get)
 			connect.DELETE("", connHandler.Delete)
+		}
+
+		polling := v1.Group("/polling")
+		{
+			polling.POST("/start", pollHandler.Start)
+			polling.POST("/stop", pollHandler.Stop)
 		}
 	}
 

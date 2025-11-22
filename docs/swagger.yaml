@@ -24,6 +24,23 @@ definitions:
     required:
     - endpoint
     type: object
+  models.StartPollingRequest:
+    properties:
+      id:
+        type: string
+      interval:
+        description: ms, default 10000
+        type: integer
+    required:
+    - id
+    type: object
+  models.StopPollingRequest:
+    properties:
+      id:
+        type: string
+    required:
+    - id
+    type: object
 info:
   contact: {}
   description: Service for managing Fanuc CNC connections and data polling
@@ -101,6 +118,70 @@ paths:
       summary: Create a new connection
       tags:
       - Connection
+  /api/v1/polling/start:
+    post:
+      consumes:
+      - application/json
+      description: Starts periodic data collection for a specific machine session
+      parameters:
+      - description: Polling Config
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.StartPollingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Start polling for a machine
+      tags:
+      - Polling
+  /api/v1/polling/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stops periodic data collection
+      parameters:
+      - description: Polling Config
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.StopPollingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Stop polling for a machine
+      tags:
+      - Polling
 securityDefinitions:
   ApiKeyAuth:
     in: header

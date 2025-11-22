@@ -11,6 +11,7 @@ import (
 	"github.com/iwtcode/fanucService/internal/interfaces"
 	"github.com/iwtcode/fanucService/internal/repository"
 	"github.com/iwtcode/fanucService/internal/services/fanuc"
+	"github.com/iwtcode/fanucService/internal/services/kafka"
 	"github.com/iwtcode/fanucService/internal/usecases"
 
 	"go.uber.org/fx"
@@ -20,18 +21,30 @@ func New() *fx.App {
 	return fx.New(
 		fx.Provide(
 			fanucService.LoadConfig,
+			kafka.NewProducer,
 			repository.NewRepository,
 			fanuc.NewService,
 			usecases.NewConnectionUsecase,
 			usecases.NewRestoreUsecase,
+			usecases.NewPollingUsecase,
 			handlers.NewConnectionHandler,
+			handlers.NewPollingHandler,
 			handlers.NewRouter,
 		),
 		fx.Invoke(
 			startServer,
 			restoreConnections,
+			registerHooks,
 		),
 	)
+}
+
+func registerHooks(lifecycle fx.Lifecycle, producer *kafka.Producer) {
+	lifecycle.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return producer.Close()
+		},
+	})
 }
 
 func restoreConnections(lifecycle fx.Lifecycle, usecase interfaces.RestoreUsecase) {

@@ -10,6 +10,7 @@ import (
 
 	adapter "github.com/iwtcode/fanucAdapter"
 	"github.com/iwtcode/fanucService/internal/interfaces"
+	"github.com/iwtcode/fanucService/internal/services/kafka"
 )
 
 const (
@@ -20,8 +21,10 @@ const (
 )
 
 type Service struct {
-	repo    interfaces.Repository
-	clients sync.Map // map[string]*adapter.Client (Key: Machine ID)
+	repo          interfaces.Repository
+	kafkaProducer *kafka.Producer
+	clients       sync.Map // map[string]*adapter.Client (Key: Machine ID)
+	pollingCancel sync.Map // map[string]context.CancelFunc (Key: Machine ID)
 }
 
 // connectResult is used to pass results from goroutines
@@ -30,9 +33,10 @@ type connectResult struct {
 	err    error
 }
 
-func NewService(repo interfaces.Repository) interfaces.FanucService {
+func NewService(repo interfaces.Repository, producer *kafka.Producer) interfaces.FanucService {
 	return &Service{
-		repo: repo,
+		repo:          repo,
+		kafkaProducer: producer,
 	}
 }
 
