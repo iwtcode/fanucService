@@ -97,5 +97,5 @@ func (h *ConnectionHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	RespondMessage(c, fmt.Sprintf("session %s successfully deleted", id))
+	RespondMessage(c, fmt.Sprintf("Session %s successfully deleted", id))
 }
