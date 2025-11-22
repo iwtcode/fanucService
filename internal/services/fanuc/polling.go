@@ -17,69 +17,58 @@ func (s *Service) StartPolling(ctx context.Context, machineID string, intervalMs
 		return fmt.Errorf("polling already active for machine %s", machineID)
 	}
 
-	// 2. Ensure connection exists and machine is reachable (REAL CHECK)
-	// CheckConnection выполняет реальный запрос GetMachineState.
-	// Если станок недоступен, вернется ошибка.
 	machine, err := s.CheckConnection(ctx, machineID)
 	if err != nil {
 		return fmt.Errorf("cannot start polling, machine unreachable: %w", err)
 	}
 
-	// 3. Get client from pool
-	val, ok := s.clients.Load(machineID)
-	if !ok {
-		return fmt.Errorf("client not found in pool for machine %s", machineID)
-	}
-	client := val.(*adapter.Client)
-
-	// 4. Update Status & Interval in DB
+	// 2. Update Mode & Interval in DB
 	s.updateInterval(machine, intervalMs)
-	s.updateStatus(machine, entities.StatusPolled)
+	s.updateMode(machine, entities.ModePolling)
 
-	// 5. Start internal polling
-	s.startPollingInternal(machineID, client, intervalMs)
+	// 3. Start polling routine
+	s.startPollingInternal(machineID, intervalMs)
 
 	return nil
-}
-
-// startPollingInternal starts the routine without DB updates or checks (used for restore)
-func (s *Service) startPollingInternal(machineID string, client *adapter.Client, intervalMs int) {
-	if intervalMs <= 0 {
-		intervalMs = 1000 // safe fallback
-	}
-
-	pollCtx, cancel := context.WithCancel(context.Background())
-	s.pollingCancel.Store(machineID, cancel)
-
-	go s.pollRoutine(pollCtx, machineID, client, time.Duration(intervalMs)*time.Millisecond)
 }
 
 func (s *Service) StopPolling(ctx context.Context, machineID string) error {
 	val, ok := s.pollingCancel.Load(machineID)
 	if !ok {
+		if machine, err := s.repo.GetByID(machineID); err == nil {
+			s.updateMode(machine, entities.ModeStatic)
+		}
 		return fmt.Errorf("polling not active for machine %s", machineID)
 	}
 
-	// Stop the goroutine
 	cancel := val.(context.CancelFunc)
 	cancel()
 	s.pollingCancel.Delete(machineID)
 
-	// Update Status in DB back to 'connected'
 	machine, err := s.repo.GetByID(machineID)
 	if err == nil {
-		s.updateStatus(machine, entities.StatusConnected)
+		s.updateMode(machine, entities.ModeStatic)
 	}
 
 	return nil
 }
 
-func (s *Service) pollRoutine(ctx context.Context, machineID string, client *adapter.Client, interval time.Duration) {
-	// Первый запуск - через интервал
-	timer := time.NewTimer(interval)
-	defer timer.Stop()
+func (s *Service) startPollingInternal(machineID string, intervalMs int) {
+	if intervalMs <= 0 {
+		intervalMs = 1000
+	}
 
-	log.Printf("Polling started for machine %s with interval %v", machineID, interval)
+	pollCtx, cancel := context.WithCancel(context.Background())
+	s.pollingCancel.Store(machineID, cancel)
+
+	go s.pollRoutine(pollCtx, machineID, time.Duration(intervalMs)*time.Millisecond)
+}
+
+func (s *Service) pollRoutine(ctx context.Context, machineID string, interval time.Duration) {
+	log.Printf("Polling routine started for machine %s with interval %v", machineID, interval)
+
+	timer := time.NewTimer(0)
+	defer timer.Stop()
 
 	for {
 		select {
@@ -87,15 +76,34 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, client *ada
 			log.Printf("Polling stopped for machine %s", machineID)
 			return
 		case <-timer.C:
-			// 1. Засекаем время начала работы
 			start := time.Now()
 
-			// 2. Выполняем опрос
+			// 1. Get or Restore Client
+			client, err := s.getOrRestoreClient(ctx, machineID)
+			if err != nil {
+				log.Printf("Polling error for machine %s: %v. Status -> Reconnecting", machineID, err)
+				if m, dbErr := s.repo.GetByID(machineID); dbErr == nil {
+					s.updateStatus(m, entities.StatusReconnecting)
+				}
+				timer.Reset(5 * time.Second)
+				continue
+			}
+
+			// Если клиент получен, обновляем статус на Connected (если был reconnecting)
+			if m, dbErr := s.repo.GetByID(machineID); dbErr == nil && m.Status == entities.StatusReconnecting {
+				s.updateStatus(m, entities.StatusConnected)
+			}
+
+			// 2. Execute Poll
 			data, err := client.GetCurrentData()
 			if err != nil {
-				log.Printf("Error polling machine %s: %v", machineID, err)
+				log.Printf("Error getting data from machine %s: %v", machineID, err)
+				if m, dbErr := s.repo.GetByID(machineID); dbErr == nil {
+					s.updateStatus(m, entities.StatusReconnecting)
+				}
+				s.clients.Delete(machineID)
 			} else {
-				// 3. Отправляем данные в Kafka (только если опрос успешен)
+				// 3. Send to Kafka
 				data.MachineID = machineID
 				payload, err := json.Marshal(data)
 				if err != nil {
@@ -107,20 +115,44 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, client *ada
 				}
 			}
 
-			// 4. Вычисляем затраченное время
 			elapsed := time.Since(start)
-
-			// 5. Вычисляем время до следующего запуска
-			// Цель: следующий запуск должен быть ровно через interval после НАЧАЛА текущего.
 			nextWait := interval - elapsed
-
 			if nextWait <= 0 {
-				// Если работа заняла больше времени, чем интервал, запускаем следующую итерацию немедленно
 				timer.Reset(0)
 			} else {
-				// Ждем оставшееся время
 				timer.Reset(nextWait)
 			}
 		}
 	}
+}
+
+func (s *Service) getOrRestoreClient(ctx context.Context, id string) (*adapter.Client, error) {
+	if val, ok := s.clients.Load(id); ok {
+		return val.(*adapter.Client), nil
+	}
+
+	machine, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	ip, port, err := parseEndpoint(machine.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &adapter.Config{
+		IP:          ip,
+		Port:        port,
+		TimeoutMs:   int32(machine.Timeout),
+		ModelSeries: machine.Series,
+	}
+
+	client, err := s.connectWithTimeout(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	s.clients.Store(id, client)
+	return client, nil
 }

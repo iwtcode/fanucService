@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	// HardConnectionTimeout sets a hard limit on any connection attempt
 	HardConnectionTimeout = 5 * time.Second
 	DefaultTimeout        = 5000
 	DefaultUnknown        = "Unknown"

@@ -13,13 +13,11 @@ import (
 )
 
 func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionRequest) (*entities.Machine, error) {
-	// 1. Check duplicates
 	existing, _ := s.repo.GetByEndpoint(req.Endpoint)
 	if existing != nil {
 		return nil, fmt.Errorf("connection to %s already exists with ID %s", req.Endpoint, existing.ID)
 	}
 
-	// 2. Apply defaults
 	series := req.Series
 	if series == "" {
 		series = DefaultUnknown
@@ -38,7 +36,6 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		timeout = int(HardConnectionTimeout.Milliseconds())
 	}
 
-	// 3. Parse endpoint
 	ip, port, err := parseEndpoint(req.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid endpoint format: %w", err)
@@ -52,13 +49,11 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		LogPath:     "./focas.log",
 	}
 
-	// 4. Connect
 	client, err := s.connectWithTimeout(adapterCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to machine: %w", err)
 	}
 
-	// 5. Save to DB
 	machine := &entities.Machine{
 		ID:        uuid.New().String(),
 		Endpoint:  req.Endpoint,
@@ -66,6 +61,7 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		Model:     model,
 		Series:    series,
 		Status:    entities.StatusConnected,
+		Mode:      entities.ModeStatic,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -75,14 +71,12 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		return nil, fmt.Errorf("failed to save machine to db: %w", err)
 	}
 
-	// 6. Save to pool
 	s.clients.Store(machine.ID, client)
 
 	return machine, nil
 }
 
 func (s *Service) GetConnections(ctx context.Context) ([]entities.Machine, error) {
-	// 1. Get list from DB
 	machines, err := s.repo.GetAll()
 	if err != nil {
 		return nil, err
@@ -92,7 +86,6 @@ func (s *Service) GetConnections(ctx context.Context) ([]entities.Machine, error
 		return machines, nil
 	}
 
-	// 2. Parallel check
 	var wg sync.WaitGroup
 	results := make([]entities.Machine, len(machines))
 
@@ -100,29 +93,24 @@ func (s *Service) GetConnections(ctx context.Context) ([]entities.Machine, error
 		wg.Add(1)
 		go func(index int, id string, original entities.Machine) {
 			defer wg.Done()
-
-			updatedMachine, err := s.CheckConnection(ctx, id)
-
+			updatedMachine, _ := s.CheckConnection(ctx, id)
 			if updatedMachine != nil {
 				results[index] = *updatedMachine
 			} else {
-				if err != nil {
-					fmt.Printf("Error checking machine %s: %v\n", id, err)
-				}
 				results[index] = original
 			}
 		}(i, m.ID, m)
 	}
 
 	wg.Wait()
-
 	return results, nil
 }
 
 func (s *Service) DeleteConnection(ctx context.Context, id string) error {
-	// First stop polling if active
-	if _, ok := s.pollingCancel.Load(id); ok {
-		_ = s.StopPolling(ctx, id)
+	if val, ok := s.pollingCancel.Load(id); ok {
+		cancel := val.(context.CancelFunc)
+		cancel()
+		s.pollingCancel.Delete(id)
 	}
 
 	if val, ok := s.clients.Load(id); ok {
@@ -142,13 +130,11 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 	var client *adapter.Client
 	var inPool bool
 
-	// 1. Check pool
 	if val, found := s.clients.Load(id); found {
 		client = val.(*adapter.Client)
 		inPool = true
 	}
 
-	// 2. Restore connection if not in pool
 	if !inPool {
 		ip, port, _ := parseEndpoint(machine.Endpoint)
 		cfg := &adapter.Config{
@@ -160,26 +146,16 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 
 		client, err = s.connectWithTimeout(cfg)
 		if err != nil {
-			// Don't change status to reconnecting, keep old status
+			s.updateStatus(machine, entities.StatusReconnecting)
 			return machine, fmt.Errorf("machine unreachable: %w", err)
 		}
 		s.clients.Store(id, client)
 	}
 
-	// 3. Health check via network call
 	checkErrChan := make(chan error, 1)
 	go func() {
-		// Just reading system info as a health check
-		sysInfo := client.GetSystemInfo()
-		if sysInfo == nil {
-			// Try a harder check if sysInfo (cached inside adapter) is suspicious,
-			// but adapter usually handles reconnects. Let's try ReadSystemInfo explicitly or assume OK if adapter not closed.
-			// Ideally, adapter.GetMachineState() is a real network call.
-			_, err := client.GetMachineState()
-			checkErrChan <- err
-		} else {
-			checkErrChan <- nil
-		}
+		_, err := client.GetMachineState()
+		checkErrChan <- err
 	}()
 
 	select {
@@ -187,20 +163,16 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 		if err != nil {
 			client.Close()
 			s.clients.Delete(id)
-			// Don't change status to reconnecting, just return error
+			s.updateStatus(machine, entities.StatusReconnecting)
 			return machine, fmt.Errorf("health check failed: %w", err)
 		}
 	case <-time.After(HardConnectionTimeout):
-		// Don't change status to reconnecting
+		s.updateStatus(machine, entities.StatusReconnecting)
 		return machine, fmt.Errorf("health check timed out")
 	}
 
-	// If machine was disconnected but check passed, we might want to ensure it is at least 'connected'
-	// But if it is 'polled', we leave it as 'polled'.
-	// Only update if it helps (e.g. from some unknown state).
-	// For now, let's assume if it works, we leave status as is (Polling logic handles its own status).
+	s.updateStatus(machine, entities.StatusConnected)
 
-	// Optional: force 'connected' if it was somehow 'reconnecting' from legacy data, but we removed that constant.
 	return machine, nil
 }
 
@@ -212,7 +184,14 @@ func (s *Service) updateStatus(m *entities.Machine, status string) {
 	}
 }
 
-// updateInterval updates the polling interval in the DB
+func (s *Service) updateMode(m *entities.Machine, mode string) {
+	if m.Mode != mode {
+		m.Mode = mode
+		m.UpdatedAt = time.Now()
+		_ = s.repo.Update(m)
+	}
+}
+
 func (s *Service) updateInterval(m *entities.Machine, interval int) {
 	if m.Interval != interval {
 		m.Interval = interval
