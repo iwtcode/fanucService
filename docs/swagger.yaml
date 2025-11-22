@@ -1,29 +1,28 @@
 definitions:
-  fanucService.ConnectionRequest:
-    properties:
-      endpoint:
-        description: ip:port
-        type: string
-      model:
-        description: Model name
-        type: string
-      series:
-        description: '"0i", "31i", etc'
-        type: string
-      timeout:
-        description: ms, default 5000
-        type: integer
-    required:
-    - endpoint
-    - series
-    type: object
-  fanucService.ConnectionResponse:
+  models.APIResponse:
     properties:
       data: {}
       message:
         type: string
       status:
         type: string
+    type: object
+  models.ConnectionRequest:
+    properties:
+      endpoint:
+        description: ip:port
+        type: string
+      model:
+        description: Human readable name
+        type: string
+      series:
+        description: '"0i", "31i"'
+        type: string
+      timeout:
+        description: ms, default 5000
+        type: integer
+    required:
+    - endpoint
     type: object
 info:
   contact: {}
@@ -45,7 +44,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fanucService.ConnectionResponse'
+            $ref: '#/definitions/models.APIResponse'
       security:
       - ApiKeyAuth: []
       summary: Delete connection
@@ -65,7 +64,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fanucService.ConnectionResponse'
+            $ref: '#/definitions/models.APIResponse'
       security:
       - ApiKeyAuth: []
       summary: Get connections or Check specific connection
@@ -74,30 +73,29 @@ paths:
     post:
       consumes:
       - application/json
-      description: Connects to a Fanuc machine. Throws 500 if connection takes longer
-        than 5 seconds.
+      description: Connects to a Fanuc machine
       parameters:
       - description: Connection Data
         in: body
         name: input
         required: true
         schema:
-          $ref: '#/definitions/fanucService.ConnectionRequest'
+          $ref: '#/definitions/models.ConnectionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fanucService.ConnectionResponse'
+            $ref: '#/definitions/models.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/fanucService.ConnectionResponse'
+            $ref: '#/definitions/models.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/fanucService.ConnectionResponse'
+            $ref: '#/definitions/models.APIResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a new connection

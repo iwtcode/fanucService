@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/iwtcode/fanucService"
+	"github.com/iwtcode/fanucService/internal/domain/models"
 	"github.com/iwtcode/fanucService/internal/interfaces"
 )
 
@@ -18,30 +18,30 @@ func NewConnectionHandler(usecase interfaces.ConnectionUsecase) *ConnectionHandl
 
 // Create
 // @Summary Create a new connection
-// @Description Connects to a Fanuc machine. Throws 500 if connection takes longer than 5 seconds.
+// @Description Connects to a Fanuc machine
 // @Tags Connection
 // @Accept json
 // @Produce json
-// @Param input body fanucService.ConnectionRequest true "Connection Data"
+// @Param input body models.ConnectionRequest true "Connection Data"
 // @Security ApiKeyAuth
-// @Success 200 {object} fanucService.ConnectionResponse
-// @Failure 400 {object} fanucService.ConnectionResponse
-// @Failure 500 {object} fanucService.ConnectionResponse
+// @Success 200 {object} models.APIResponse
+// @Failure 400 {object} models.APIResponse
+// @Failure 500 {object} models.APIResponse
 // @Router /api/v1/connect [post]
 func (h *ConnectionHandler) Create(c *gin.Context) {
-	var req fanucService.ConnectionRequest
+	var req models.ConnectionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, fanucService.ConnectionResponse{Status: "error", Message: err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	machine, err := h.usecase.Create(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, fanucService.ConnectionResponse{Status: "error", Message: err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, fanucService.ConnectionResponse{Status: "ok", Data: machine})
+	RespondSuccess(c, machine)
 }
 
 // Get
@@ -51,33 +51,29 @@ func (h *ConnectionHandler) Create(c *gin.Context) {
 // @Produce json
 // @Param id query string false "Machine ID (optional)"
 // @Security ApiKeyAuth
-// @Success 200 {object} fanucService.ConnectionResponse
+// @Success 200 {object} models.APIResponse
 // @Router /api/v1/connect [get]
 func (h *ConnectionHandler) Get(c *gin.Context) {
 	id := c.Query("id")
 
-	// Если ID передан, выполняем проверку конкретного подключения
+	// Check specific connection
 	if id != "" {
 		machine, err := h.usecase.Check(c.Request.Context(), id)
 		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, fanucService.ConnectionResponse{
-				Status:  "error",
-				Message: err.Error(),
-				Data:    machine,
-			})
+			RespondError(c, http.StatusServiceUnavailable, err.Error(), machine)
 			return
 		}
-		c.JSON(http.StatusOK, fanucService.ConnectionResponse{Status: "ok", Data: machine})
+		RespondSuccess(c, machine)
 		return
 	}
 
-	// Иначе возвращаем список всех подключений
+	// List all
 	machines, err := h.usecase.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, fanucService.ConnectionResponse{Status: "error", Message: err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, fanucService.ConnectionResponse{Status: "ok", Data: machines})
+	RespondSuccess(c, machines)
 }
 
 // Delete
@@ -86,18 +82,18 @@ func (h *ConnectionHandler) Get(c *gin.Context) {
 // @Param id query string true "Machine ID"
 // @Produce json
 // @Security ApiKeyAuth
-// @Success 200 {object} fanucService.ConnectionResponse
+// @Success 200 {object} models.APIResponse
 // @Router /api/v1/connect [delete]
 func (h *ConnectionHandler) Delete(c *gin.Context) {
 	id := c.Query("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, fanucService.ConnectionResponse{Status: "error", Message: "id is required"})
+		RespondError(c, http.StatusBadRequest, "id is required")
 		return
 	}
 
 	if err := h.usecase.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, fanucService.ConnectionResponse{Status: "error", Message: err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, fanucService.ConnectionResponse{Status: "ok", Message: "deleted"})
+	RespondSuccess(c, "deleted")
 }

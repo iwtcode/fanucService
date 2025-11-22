@@ -42,7 +42,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionResponse"
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     }
                 }
@@ -53,7 +53,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Connects to a Fanuc machine. Throws 500 if connection takes longer than 5 seconds.",
+                "description": "Connects to a Fanuc machine",
                 "consumes": [
                     "application/json"
                 ],
@@ -71,7 +71,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionRequest"
+                            "$ref": "#/definitions/models.ConnectionRequest"
                         }
                     }
                 ],
@@ -79,19 +79,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionResponse"
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionResponse"
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionResponse"
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     }
                 }
@@ -122,7 +122,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fanucService.ConnectionResponse"
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     }
                 }
@@ -130,32 +130,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "fanucService.ConnectionRequest": {
-            "type": "object",
-            "required": [
-                "endpoint",
-                "series"
-            ],
-            "properties": {
-                "endpoint": {
-                    "description": "ip:port",
-                    "type": "string"
-                },
-                "model": {
-                    "description": "Model name",
-                    "type": "string"
-                },
-                "series": {
-                    "description": "\"0i\", \"31i\", etc",
-                    "type": "string"
-                },
-                "timeout": {
-                    "description": "ms, default 5000",
-                    "type": "integer"
-                }
-            }
-        },
-        "fanucService.ConnectionResponse": {
+        "models.APIResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -164,6 +139,30 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "models.ConnectionRequest": {
+            "type": "object",
+            "required": [
+                "endpoint"
+            ],
+            "properties": {
+                "endpoint": {
+                    "description": "ip:port",
+                    "type": "string"
+                },
+                "model": {
+                    "description": "Human readable name",
+                    "type": "string"
+                },
+                "series": {
+                    "description": "\"0i\", \"31i\"",
+                    "type": "string"
+                },
+                "timeout": {
+                    "description": "ms, default 5000",
+                    "type": "integer"
                 }
             }
         }

@@ -3,8 +3,8 @@ package usecases
 import (
 	"context"
 
-	"github.com/iwtcode/fanucService"
 	"github.com/iwtcode/fanucService/internal/domain/entities"
+	"github.com/iwtcode/fanucService/internal/domain/models"
 	"github.com/iwtcode/fanucService/internal/interfaces"
 )
 
@@ -16,7 +16,7 @@ func NewConnectionUsecase(service interfaces.FanucService) interfaces.Connection
 	return &connectionUsecase{service: service}
 }
 
-func (u *connectionUsecase) Create(ctx context.Context, req fanucService.ConnectionRequest) (*entities.Machine, error) {
+func (u *connectionUsecase) Create(ctx context.Context, req models.ConnectionRequest) (*entities.Machine, error) {
 	return u.service.CreateConnection(ctx, req)
 }
 

@@ -23,6 +23,7 @@ func New() *fx.App {
 			repository.NewRepository,
 			fanuc.NewService,
 			usecases.NewConnectionUsecase,
+			usecases.NewRestoreUsecase,
 			handlers.NewConnectionHandler,
 			handlers.NewRouter,
 		),
@@ -33,10 +34,10 @@ func New() *fx.App {
 	)
 }
 
-func restoreConnections(lifecycle fx.Lifecycle, service interfaces.FanucService) {
+func restoreConnections(lifecycle fx.Lifecycle, usecase interfaces.RestoreUsecase) {
 	lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			go service.RestoreConnections()
+			usecase.Restore()
 			return nil
 		},
 	})

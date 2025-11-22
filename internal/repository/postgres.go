@@ -29,7 +29,9 @@ func NewRepository(cfg *fanucService.Config) (interfaces.Repository, error) {
 
 	var exists bool
 	checkQuery := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = '%s')", cfg.Database.Name)
-	rootDB.Raw(checkQuery).Scan(&exists)
+	if err := rootDB.Raw(checkQuery).Scan(&exists).Error; err != nil {
+		return nil, fmt.Errorf("failed to check db existence: %w", err)
+	}
 
 	if !exists {
 		log.Printf("Database %s does not exist. Creating...", cfg.Database.Name)
@@ -55,40 +57,4 @@ func NewRepository(cfg *fanucService.Config) (interfaces.Repository, error) {
 	}
 
 	return &postgresRepository{db: db}, nil
-}
-
-func (r *postgresRepository) Create(machine *entities.Machine) error {
-	return r.db.Create(machine).Error
-}
-
-func (r *postgresRepository) Update(machine *entities.Machine) error {
-	return r.db.Save(machine).Error
-}
-
-func (r *postgresRepository) Delete(id string) error {
-	return r.db.Delete(&entities.Machine{}, "id = ?", id).Error
-}
-
-func (r *postgresRepository) GetByID(id string) (*entities.Machine, error) {
-	var m entities.Machine
-	err := r.db.First(&m, "id = ?", id).Error
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
-
-func (r *postgresRepository) GetByEndpoint(endpoint string) (*entities.Machine, error) {
-	var m entities.Machine
-	err := r.db.First(&m, "endpoint = ?", endpoint).Error
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
-
-func (r *postgresRepository) GetAll() ([]entities.Machine, error) {
-	var list []entities.Machine
-	err := r.db.Find(&list).Error
-	return list, err
 }

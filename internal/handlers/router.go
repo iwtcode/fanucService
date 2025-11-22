@@ -23,7 +23,7 @@ func NewRouter(cfg *fanucService.Config, connHandler *ConnectionHandler) *gin.En
 		connect := v1.Group("/connect")
 		{
 			connect.POST("", connHandler.Create)
-			connect.GET("", connHandler.Get) // Обрабатывает и список, и проверку по ID
+			connect.GET("", connHandler.Get)
 			connect.DELETE("", connHandler.Delete)
 		}
 	}
