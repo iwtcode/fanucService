@@ -2,7 +2,7 @@ module github.com/iwtcode/fanucService
 
 go 1.24.4
 
-require github.com/iwtcode/fanucAdapter v1.0.7
+require github.com/iwtcode/fanucAdapter v1.0.8
 
 require (
 	github.com/gin-gonic/gin v1.11.0

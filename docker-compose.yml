@@ -7,12 +7,17 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: echo srvr | nc localhost 2181 || exit 1
+      interval: 5s
+      retries: 10
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -24,17 +29,22 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: cub kafka-ready -b localhost:9092 1 20
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
 
   kafka-setup:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka-setup
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     command: >
       sh -c "
-        echo 'Ожидание готовности Kafka...' &&
-        cub kafka-ready -b kafka:29092 1 30 &&
-        echo 'Kafka готова!' &&
+        echo 'Kafka стала healthy. Начинаем создание топиков...' &&
         kafka-topics --create --if-not-exists --topic fanuc_data --partitions 1 --replication-factor 1 --bootstrap-server kafka:29092
       "
 
@@ -42,7 +52,10 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     depends_on:
-      - kafka-setup
+      kafka:
+        condition: service_healthy
+      kafka-setup:
+        condition: service_completed_successfully
     ports:
       - "8081:8080"
     environment:
