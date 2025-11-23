@@ -17,7 +17,7 @@ func NewPollingUsecase(service interfaces.FanucService) interfaces.PollingUsecas
 
 func (u *pollingUsecase) Start(ctx context.Context, req models.StartPollingRequest) error {
 	if req.Interval <= 0 {
-		req.Interval = 10000
+		req.Interval = 5000
 	}
 
 	return u.service.StartPolling(ctx, req.ID, req.Interval)

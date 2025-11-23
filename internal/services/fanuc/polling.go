@@ -79,7 +79,7 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 			start := time.Now()
 
 			// 1. Get or Restore Client
-			client, err := s.getOrRestoreClient(ctx, machineID)
+			client, err := s.getOrRestoreClient(machineID)
 			if err != nil {
 				log.Printf("Polling error for machine %s: %v. Status -> Reconnecting", machineID, err)
 				if m, dbErr := s.repo.GetByID(machineID); dbErr == nil {
@@ -103,12 +103,11 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 				s.clients.Delete(machineID)
 			} else {
 				// 3. Send to Kafka
-				data.MachineID = machineID
 				payload, err := json.Marshal(data)
 				if err != nil {
 					log.Printf("Failed to marshal polling data: %v", err)
 				} else {
-					if err := s.kafkaProducer.Send(context.Background(), []byte(machineID), payload); err != nil {
+					if err := s.kafkaProducer.Send(context.Background(), []byte(data.MachineID), payload); err != nil {
 						log.Printf("Failed to send polling data to Kafka: %v", err)
 					}
 				}
@@ -125,7 +124,7 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 	}
 }
 
-func (s *Service) getOrRestoreClient(ctx context.Context, id string) (*adapter.Client, error) {
+func (s *Service) getOrRestoreClient(id string) (*adapter.Client, error) {
 	if val, ok := s.clients.Load(id); ok {
 		return val.(*adapter.Client), nil
 	}
