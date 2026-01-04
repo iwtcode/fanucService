@@ -79,9 +79,6 @@ docker compose up -d
 4️⃣ **Запуск приложения**
 
 ```bash
-# Linux
-./build/fanuc_service
-
 # Golang
 go run cmd/app/main.go
 ```
@@ -103,7 +100,7 @@ curl -X 'POST' \
   -H 'X-API-Key: secret_key' \
   -H 'Content-Type: application/json' \
   -d '{
-    "endpoint": "192.168.56.1:8193",
+    "endpoint": "10.0.0.1:8193",
     "timeout": 5000,
     "model": "FS0i-D",
     "series": "0i"
@@ -115,7 +112,7 @@ curl -X 'POST' \
   "status": "ok",
   "data": {
     "id": "90e09ee9-7d39-4a15-8a00-b7fb351b27ee",
-    "endpoint": "192.168.56.1:8193",
+    "endpoint": "10.0.0.1:8193",
     "timeout": 5000,
     "model": "FS0i-D",
     "series": "0i",
@@ -147,7 +144,7 @@ curl -X 'GET' \
   "data": [
     {
       "id": "90e09ee9-7d39-4a15-8a00-b7fb351b27ee",
-      "endpoint": "192.168.56.1:8193",
+      "endpoint": "10.0.0.1:8193",
       "timeout": 5000,
       "model": "FS0i-D",
       "series": "0i",
@@ -159,7 +156,7 @@ curl -X 'GET' \
     },
     {
       "id": "667204be-5e3c-433f-9700-ea931ee14f63",
-      "endpoint": "192.168.56.1:8195",
+      "endpoint": "10.0.0.2:8194",
       "timeout": 5000,
       "model": "FS30i-D",
       "series": "30i",
@@ -191,7 +188,7 @@ curl -X 'GET' \
   "status": "ok",
   "data": {
     "id": "90e09ee9-7d39-4a15-8a00-b7fb351b27ee",
-    "endpoint": "192.168.56.1:8193",
+    "endpoint": "10.0.0.1:8193",
     "timeout": 5000,
     "model": "FS0i-D",
     "series": "0i",

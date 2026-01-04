@@ -39,6 +39,7 @@ func (s *Service) checkOneOnce(machine entities.Machine) {
 		Port:        port,
 		TimeoutMs:   int32(machine.Timeout),
 		ModelSeries: machine.Series,
+		LogLevel:    s.cfg.Adapter.LogLevel,
 	}
 
 	client, err := s.connectWithTimeout(cfg)

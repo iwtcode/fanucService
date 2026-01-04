@@ -46,7 +46,7 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		Port:        port,
 		TimeoutMs:   int32(timeout),
 		ModelSeries: series,
-		LogPath:     "./focas.log",
+		LogLevel:    s.cfg.Adapter.LogLevel,
 	}
 
 	client, err := s.connectWithTimeout(adapterCfg)
@@ -142,6 +142,7 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 			Port:        port,
 			TimeoutMs:   int32(machine.Timeout),
 			ModelSeries: machine.Series,
+			LogLevel:    s.cfg.Adapter.LogLevel,
 		}
 
 		client, err = s.connectWithTimeout(cfg)

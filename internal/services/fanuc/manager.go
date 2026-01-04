@@ -9,6 +9,7 @@ import (
 	"time"
 
 	adapter "github.com/iwtcode/fanucAdapter"
+	"github.com/iwtcode/fanucService"
 	"github.com/iwtcode/fanucService/internal/interfaces"
 	"github.com/iwtcode/fanucService/internal/services/kafka"
 )
@@ -20,6 +21,7 @@ const (
 )
 
 type Service struct {
+	cfg           *fanucService.Config
 	repo          interfaces.Repository
 	kafkaProducer *kafka.Producer
 	clients       sync.Map // map[string]*adapter.Client (Key: Machine ID)
@@ -31,8 +33,9 @@ type connectResult struct {
 	err    error
 }
 
-func NewService(repo interfaces.Repository, producer *kafka.Producer) interfaces.FanucService {
+func NewService(cfg *fanucService.Config, repo interfaces.Repository, producer *kafka.Producer) interfaces.FanucService {
 	return &Service{
+		cfg:           cfg,
 		repo:          repo,
 		kafkaProducer: producer,
 	}

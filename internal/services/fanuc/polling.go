@@ -144,6 +144,7 @@ func (s *Service) getOrRestoreClient(id string) (*adapter.Client, error) {
 		Port:        port,
 		TimeoutMs:   int32(machine.Timeout),
 		ModelSeries: machine.Series,
+		LogLevel:    s.cfg.Adapter.LogLevel,
 	}
 
 	client, err := s.connectWithTimeout(cfg)

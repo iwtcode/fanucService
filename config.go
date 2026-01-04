@@ -10,6 +10,7 @@ type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Kafka    KafkaConfig
+	Adapter  AdapterConfig
 }
 
 type AppConfig struct {
@@ -31,6 +32,10 @@ type KafkaConfig struct {
 	Topic  string
 }
 
+type AdapterConfig struct {
+	LogLevel string
+}
+
 func LoadConfig() *Config {
 	_ = godotenv.Load()
 
@@ -50,6 +55,9 @@ func LoadConfig() *Config {
 		Kafka: KafkaConfig{
 			Broker: getEnv("KAFKA_BROKER"),
 			Topic:  getEnv("KAFKA_TOPIC"),
+		},
+		Adapter: AdapterConfig{
+			LogLevel: getEnv("ADAPTER_LOG_LEVEL", "info"),
 		},
 	}
 }

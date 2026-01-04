@@ -2,7 +2,7 @@ module github.com/iwtcode/fanucService
 
 go 1.24.4
 
-require github.com/iwtcode/fanucAdapter v1.0.9
+require github.com/iwtcode/fanucAdapter v1.1.1
 
 require (
 	github.com/gin-gonic/gin v1.11.0
@@ -57,6 +57,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.57.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.uber.org/dig v1.19.0 // indirect
