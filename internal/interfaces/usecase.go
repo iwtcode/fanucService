@@ -22,3 +22,7 @@ type PollingUsecase interface {
 	Start(ctx context.Context, req models.StartPollingRequest) error
 	Stop(ctx context.Context, req models.StopPollingRequest) error
 }
+
+type ProgramUsecase interface {
+	GetProgram(ctx context.Context, id string) (string, error)
+}

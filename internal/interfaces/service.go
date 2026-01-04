@@ -16,4 +16,6 @@ type FanucService interface {
 
 	StartPolling(ctx context.Context, machineID string, intervalMs int) error
 	StopPolling(ctx context.Context, machineID string) error
+
+	GetControlProgram(ctx context.Context, id string) (string, error)
 }

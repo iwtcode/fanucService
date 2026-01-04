@@ -13,6 +13,7 @@ func NewRouter(
 	cfg *fanucService.Config,
 	connHandler *ConnectionHandler,
 	pollHandler *PollingHandler,
+	progHandler *ProgramHandler,
 ) *gin.Engine {
 	gin.SetMode(cfg.App.GinMode)
 	r := gin.Default()
@@ -36,6 +37,8 @@ func NewRouter(
 			polling.POST("/start", pollHandler.Start)
 			polling.POST("/stop", pollHandler.Stop)
 		}
+
+		v1.GET("/program", progHandler.Get)
 	}
 
 	return r

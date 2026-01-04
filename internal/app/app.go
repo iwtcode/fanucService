@@ -27,8 +27,10 @@ func New() *fx.App {
 			usecases.NewConnectionUsecase,
 			usecases.NewRestoreUsecase,
 			usecases.NewPollingUsecase,
+			usecases.NewProgramUsecase,
 			handlers.NewConnectionHandler,
 			handlers.NewPollingHandler,
+			handlers.NewProgramHandler,
 			handlers.NewRouter,
 		),
 		fx.Invoke(
