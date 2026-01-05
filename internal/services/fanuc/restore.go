@@ -14,16 +14,17 @@ func (s *Service) RestoreConnections() error {
 	}
 
 	log.Printf("Restoring state for %d machines...", len(machines))
-
-	for _, m := range machines {
-		if m.Mode == entities.ModePolling {
-			log.Printf("Machine %s is in Polling mode. Starting polling routine...", m.ID)
-			s.startPollingInternal(m.ID, m.Interval)
-			continue
+	go func() {
+		for _, m := range machines {
+			if m.Mode == entities.ModePolling {
+				log.Printf("Machine %s is in Polling mode. Starting polling routine...", m.ID)
+				s.startPollingInternal(m.ID, m.Interval)
+				continue
+			}
+			s.checkOneOnce(m)
 		}
+	}()
 
-		go s.checkOneOnce(m)
-	}
 	return nil
 }
 
@@ -39,7 +40,6 @@ func (s *Service) checkOneOnce(machine entities.Machine) {
 		Port:        port,
 		TimeoutMs:   int32(machine.Timeout),
 		ModelSeries: machine.Series,
-		LogLevel:    s.cfg.Adapter.LogLevel,
 	}
 
 	client, err := s.connectWithTimeout(cfg)
