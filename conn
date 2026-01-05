@@ -1,0 +1,143 @@
+#!/bin/bash
+
+MACHINES=(
+    "10.0.0.1:8194|5000|FS0i-D|0i"
+    "10.0.0.2:8195|5000|FS30i-B|30i"
+    "10.0.0.3:8196|5000|FS31i-B|31i"
+    "10.0.0.4:8197|2000|FS32i-F|32i"
+)
+
+POLLING_INTERVAL=5000
+
+ENV_FILE=".env"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo -e "\e[31m[ERROR]\e[0m File $ENV_FILE not found in current directory."
+    exit 1
+fi
+
+export $(grep -v '^#' "$ENV_FILE" | xargs)
+
+API_URL="http://localhost:${APP_PORT:-8080}/api/v1"
+
+if [ -z "$API_KEY" ]; then
+    echo -e "\e[31m[ERROR]\e[0m API_KEY not found in .env"
+    exit 1
+fi
+
+export PGHOST=$DB_HOST
+export PGPORT=$DB_PORT
+export PGUSER=$DB_USER
+export PGPASSWORD=$DB_PASSWORD
+export PGDATABASE=$DB_NAME
+
+log_info() { echo -e "\e[32m[INFO]\e[0m $1"; }
+log_warn() { echo -e "\e[33m[WARN]\e[0m $1"; }
+log_err() { echo -e "\e[31m[ERROR]\e[0m $1"; }
+
+get_id_from_db() {
+    local endpoint="$1"
+    # -t: только кортежи, -A: без выравнивания
+    psql -t -A -c "SELECT id FROM machines WHERE endpoint = '$endpoint' LIMIT 1;" 2>/dev/null
+}
+
+# Парсинг JSON (id) без jq
+get_json_id() {
+    echo "$1" | grep -o '"id":"[^"]*"' | cut -d'"' -f4
+}
+
+create_connections() {
+    log_info "Start creating connections..."
+    log_info "Target API: $API_URL"
+    log_info "Target DB: $PGDATABASE on $PGHOST"
+
+    for machine in "${MACHINES[@]}"; do
+        IFS='|' read -r endpoint timeout model series <<< "$machine"
+        
+        endpoint=$(echo "$endpoint" | xargs)
+        timeout=$(echo "$timeout" | xargs)
+        model=$(echo "$model" | xargs)
+        series=$(echo "$series" | xargs)
+
+        echo "---------------------------------------------------"
+        echo "Processing: $endpoint"
+
+        EXISTING_ID=$(get_id_from_db "$endpoint")
+        
+        if [ -n "$EXISTING_ID" ]; then
+            log_warn "Already exists in DB (ID: $EXISTING_ID)."
+            ID=$EXISTING_ID
+        else
+            RESPONSE=$(curl -s -X POST "$API_URL/connect" \
+                -H "Content-Type: application/json" \
+                -H "X-API-Key: $API_KEY" \
+                -d "{
+                    \"endpoint\": \"$endpoint\",
+                    \"timeout\": $timeout,
+                    \"model\": \"$model\",
+                    \"series\": \"$series\"
+                }")
+
+            ID=$(get_json_id "$RESPONSE")
+            
+            if [ -z "$ID" ]; then
+                log_err "Failed to connect: $RESPONSE"
+                continue
+            fi
+            log_info "Created connection. ID: $ID"
+        fi
+
+        log_info "Starting polling..."
+        curl -s -X POST "$API_URL/polling/start" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "{
+                \"id\": \"$ID\",
+                \"interval\": $POLLING_INTERVAL
+            }"
+        echo "" 
+    done
+}
+
+delete_connections() {
+    log_info "Start deleting connections based on Endpoints..."
+    log_info "Reading DB: $PGDATABASE"
+
+    for machine in "${MACHINES[@]}"; do
+        IFS='|' read -r endpoint _ _ _ <<< "$machine"
+        endpoint=$(echo "$endpoint" | xargs)
+
+        echo "---------------------------------------------------"
+        echo "Looking up: $endpoint"
+
+        ID=$(get_id_from_db "$endpoint")
+
+        if [ -z "$ID" ]; then
+            log_warn "Not found in DB. Skipping."
+            continue
+        fi
+
+        log_info "Found ID: $ID. Deleting via API..."
+
+        DEL_RESPONSE=$(curl -s -X DELETE "$API_URL/connect?id=$ID" \
+            -H "X-API-Key: $API_KEY")
+
+        echo "Response: $DEL_RESPONSE"
+    done
+}
+
+if ! command -v psql &> /dev/null; then
+    log_err "psql command not found. Please install postgresql-client."
+    exit 1
+fi
+
+if [ "$1" == "c" ]; then
+    create_connections
+elif [ "$1" == "d" ]; then
+    delete_connections
+else
+    echo "Usage: $0 {c|d}"
+    echo "  c - Create connections defined in script"
+    echo "  d - Look up endpoints in DB (psql) and delete them via API"
+    exit 1
+fi
