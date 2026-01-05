@@ -26,8 +26,8 @@ type Service struct {
 	repo          interfaces.Repository
 	kafkaProducer *kafka.Producer
 	logger        *logrus.Logger
-	clients       sync.Map // map[string]*adapter.Client (Key: Machine ID)
-	pollingCancel sync.Map // map[string]context.CancelFunc (Key: Machine ID)
+	clients       sync.Map
+	pollingCancel sync.Map
 }
 
 type connectResult struct {

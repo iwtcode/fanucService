@@ -11,7 +11,6 @@ import (
 )
 
 func (s *Service) StartPolling(ctx context.Context, machineID string, intervalMs int) error {
-	// 1. Check if already polling
 	if _, exists := s.pollingCancel.Load(machineID); exists {
 		return fmt.Errorf("polling already active for machine %s", machineID)
 	}
@@ -21,11 +20,8 @@ func (s *Service) StartPolling(ctx context.Context, machineID string, intervalMs
 		return fmt.Errorf("cannot start polling, machine unreachable: %w", err)
 	}
 
-	// 2. Update Mode & Interval in DB
 	s.updateInterval(machine, intervalMs)
 	s.updateMode(machine, entities.ModePolling)
-
-	// 3. Start polling routine
 	s.startPollingInternal(machineID, intervalMs)
 
 	return nil

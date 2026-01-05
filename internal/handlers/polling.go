@@ -40,7 +40,6 @@ func (h *PollingHandler) Start(c *gin.Context) {
 		return
 	}
 
-	// Используем новую функцию для правильного формата ответа
 	RespondMessage(c, "Polling started for session "+req.ID)
 }
 

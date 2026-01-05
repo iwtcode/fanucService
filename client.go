@@ -86,13 +86,11 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 	}
 	defer resp.Body.Close()
 
-	// Читаем тело ответа
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Если статус код плохой, пытаемся достать сообщение об ошибке
 	if resp.StatusCode >= 400 {
 		var errResp baseResponse
 		if jsonErr := json.Unmarshal(respBytes, &errResp); jsonErr == nil && errResp.Message != "" {
@@ -101,12 +99,10 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		return fmt.Errorf("api error (%d): %s", resp.StatusCode, string(respBytes))
 	}
 
-	// Если результат не требуется (например, для Delete), выходим
 	if result == nil {
 		return nil
 	}
 
-	// Декодируем успешный ответ
 	if err := json.Unmarshal(respBytes, result); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}

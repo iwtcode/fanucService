@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockResponse helpers
 type apiResponse struct {
 	Status  string      `json:"status"`
 	Message string      `json:"message,omitempty"`
@@ -21,22 +20,18 @@ type apiResponse struct {
 }
 
 func TestClient_CreateConnection(t *testing.T) {
-	// 1. Создаем мок-сервер
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Проверки запроса
 		assert.Equal(t, "/api/v1/connect", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "test-api-key", r.Header.Get("X-API-Key"))
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
-		// Проверка тела запроса
 		var reqBody fanucService.ConnectionRequest
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
 		require.NoError(t, err)
 		assert.Equal(t, "192.168.1.10:8193", reqBody.Endpoint)
 		assert.Equal(t, "0i", reqBody.Series)
 
-		// Формируем ответ
 		resp := apiResponse{
 			Status: "ok",
 			Data: fanucService.MachineDTO{
@@ -50,10 +45,8 @@ func TestClient_CreateConnection(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// 2. Создаем клиент
 	client := fanucService.NewClient(server.URL, "test-api-key")
 
-	// 3. Выполняем запрос
 	req := fanucService.ConnectionRequest{
 		Endpoint: "192.168.1.10:8193",
 		Timeout:  1000,
@@ -62,7 +55,6 @@ func TestClient_CreateConnection(t *testing.T) {
 	}
 	result, err := client.CreateConnection(context.Background(), req)
 
-	// 4. Проверки результата
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "uuid-123", result.ID)
@@ -125,7 +117,6 @@ func TestClient_DeleteConnection(t *testing.T) {
 		assert.Equal(t, "id=uuid-123", r.URL.RawQuery)
 		assert.Equal(t, http.MethodDelete, r.Method)
 
-		// Для Delete возвращается Message, но client.go игнорирует result == nil
 		resp := apiResponse{
 			Status:  "ok",
 			Message: "deleted",
@@ -189,7 +180,6 @@ func TestClient_GetControlProgram(t *testing.T) {
 		assert.Equal(t, "id=uuid-123", r.URL.RawQuery)
 		assert.Equal(t, http.MethodGet, r.Method)
 
-		// GetControlProgram ожидает RAW текст при успехе
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(expectedProgram))
 	}))
@@ -223,7 +213,6 @@ func TestClient_AuthError(t *testing.T) {
 func TestClient_GetControlProgram_Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		// Возвращаем JSON ошибку
 		resp := apiResponse{
 			Status:  "error",
 			Message: "machine not reachable",
@@ -241,7 +230,6 @@ func TestClient_GetControlProgram_Error(t *testing.T) {
 }
 
 func TestClient_Timeout(t *testing.T) {
-	// Создаем сервер, который отвечает дольше, чем таймаут контекста
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)

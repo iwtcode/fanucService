@@ -16,12 +16,10 @@ func (s *Service) GetControlProgram(ctx context.Context, id string) (string, err
 		return "", fmt.Errorf("machine unreachable: %w", err)
 	}
 
-	// Если клиент получен успешно, обновляем статус, если он был плохим
 	if m, dbErr := s.repo.GetByID(id); dbErr == nil && m.Status == entities.StatusReconnecting {
 		s.updateStatus(m, entities.StatusConnected)
 	}
 
-	// Запрашиваем программу у адаптера
 	program, err := client.GetControlProgram()
 	if err != nil {
 		return "", fmt.Errorf("failed to download program: %w", err)

@@ -7,7 +7,6 @@ import (
 	"github.com/iwtcode/fanucService/internal/domain/models"
 )
 
-// RespondSuccess sends a standardized 200 OK response with data
 func RespondSuccess(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Status: "ok",
@@ -15,7 +14,6 @@ func RespondSuccess(c *gin.Context, data interface{}) {
 	})
 }
 
-// RespondMessage sends a standardized 200 OK response with a message only
 func RespondMessage(c *gin.Context, message string) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Status:  "ok",
@@ -23,7 +21,6 @@ func RespondMessage(c *gin.Context, message string) {
 	})
 }
 
-// RespondError sends a standardized error response
 func RespondError(c *gin.Context, code int, message string, data ...interface{}) {
 	var d interface{}
 	if len(data) > 0 {

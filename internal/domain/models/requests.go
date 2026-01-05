@@ -9,7 +9,7 @@ type ConnectionRequest struct {
 
 type StartPollingRequest struct {
 	ID       string `json:"id" binding:"required"`
-	Interval int    `json:"interval"` // ms, default 10000
+	Interval int    `json:"interval"` // ms, default 5000
 }
 
 type StopPollingRequest struct {
