@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	adapter "github.com/iwtcode/fanucAdapter"
@@ -50,6 +49,7 @@ func (s *Service) StopPolling(ctx context.Context, machineID string) error {
 		s.updateMode(machine, entities.ModeStatic)
 	}
 
+	s.logger.Infof("Polling stopped by request for machine %s", machineID)
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (s *Service) startPollingInternal(machineID string, intervalMs int) {
 }
 
 func (s *Service) pollRoutine(ctx context.Context, machineID string, interval time.Duration) {
-	log.Printf("Polling routine started for machine %s with interval %v", machineID, interval)
+	s.logger.Infof("Polling routine started for machine %s with interval %v", machineID, interval)
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -73,7 +73,7 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("Polling stopped for machine %s", machineID)
+			s.logger.Infof("Polling routine context cancelled for machine %s", machineID)
 			return
 		case <-timer.C:
 			start := time.Now()
@@ -81,7 +81,7 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 			// 1. Get or Restore Client
 			client, err := s.getOrRestoreClient(machineID)
 			if err != nil {
-				log.Printf("Polling error for machine %s: %v. Status -> Reconnecting", machineID, err)
+				s.logger.Warnf("Polling error for machine %s: %v. Status -> Reconnecting", machineID, err)
 				if m, dbErr := s.repo.GetByID(machineID); dbErr == nil {
 					s.updateStatus(m, entities.StatusReconnecting)
 				}
@@ -91,12 +91,13 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 
 			if m, dbErr := s.repo.GetByID(machineID); dbErr == nil && m.Status == entities.StatusReconnecting {
 				s.updateStatus(m, entities.StatusConnected)
+				s.logger.Infof("Machine %s reconnected during polling", machineID)
 			}
 
 			// 2. Execute Poll
 			data, err := client.GetCurrentData()
 			if err != nil {
-				log.Printf("Error getting data from machine %s: %v", machineID, err)
+				s.logger.Errorf("Error getting data from machine %s: %v", machineID, err)
 				if m, dbErr := s.repo.GetByID(machineID); dbErr == nil {
 					s.updateStatus(m, entities.StatusReconnecting)
 				}
@@ -105,10 +106,10 @@ func (s *Service) pollRoutine(ctx context.Context, machineID string, interval ti
 				// 3. Send to Kafka
 				payload, err := json.Marshal(data)
 				if err != nil {
-					log.Printf("Failed to marshal polling data: %v", err)
+					s.logger.Errorf("Failed to marshal polling data for %s: %v", machineID, err)
 				} else {
 					if err := s.kafkaProducer.Send(context.Background(), []byte(data.MachineID), payload); err != nil {
-						log.Printf("Failed to send polling data to Kafka: %v", err)
+						s.logger.Errorf("Failed to send polling data to Kafka for %s: %v", machineID, err)
 					}
 				}
 			}
@@ -144,7 +145,7 @@ func (s *Service) getOrRestoreClient(id string) (*adapter.Client, error) {
 		Port:        port,
 		TimeoutMs:   int32(machine.Timeout),
 		ModelSeries: machine.Series,
-		LogLevel:    s.cfg.Adapter.LogLevel,
+		LogLevel:    s.cfg.Logger.AdapterLevel,
 	}
 
 	client, err := s.connectWithTimeout(cfg)

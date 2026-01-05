@@ -46,7 +46,7 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 		Port:        port,
 		TimeoutMs:   int32(timeout),
 		ModelSeries: series,
-		LogLevel:    s.cfg.Adapter.LogLevel,
+		LogLevel:    s.cfg.Logger.AdapterLevel,
 	}
 
 	client, err := s.connectWithTimeout(adapterCfg)
@@ -72,6 +72,7 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ConnectionReq
 	}
 
 	s.clients.Store(machine.ID, client)
+	s.logger.Infof("Created new connection: %s (%s)", machine.Endpoint, machine.ID)
 
 	return machine, nil
 }
@@ -118,6 +119,7 @@ func (s *Service) DeleteConnection(ctx context.Context, id string) error {
 		client.Close()
 		s.clients.Delete(id)
 	}
+	s.logger.Infof("Deleted connection: %s", id)
 	return s.repo.Delete(id)
 }
 
@@ -142,7 +144,7 @@ func (s *Service) CheckConnection(ctx context.Context, id string) (*entities.Mac
 			Port:        port,
 			TimeoutMs:   int32(machine.Timeout),
 			ModelSeries: machine.Series,
-			LogLevel:    s.cfg.Adapter.LogLevel,
+			LogLevel:    s.cfg.Logger.AdapterLevel,
 		}
 
 		client, err = s.connectWithTimeout(cfg)

@@ -12,6 +12,7 @@ import (
 	"github.com/iwtcode/fanucService"
 	"github.com/iwtcode/fanucService/internal/interfaces"
 	"github.com/iwtcode/fanucService/internal/services/kafka"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -24,6 +25,7 @@ type Service struct {
 	cfg           *fanucService.Config
 	repo          interfaces.Repository
 	kafkaProducer *kafka.Producer
+	logger        *logrus.Logger
 	clients       sync.Map // map[string]*adapter.Client (Key: Machine ID)
 	pollingCancel sync.Map // map[string]context.CancelFunc (Key: Machine ID)
 }
@@ -33,11 +35,12 @@ type connectResult struct {
 	err    error
 }
 
-func NewService(cfg *fanucService.Config, repo interfaces.Repository, producer *kafka.Producer) interfaces.FanucService {
+func NewService(cfg *fanucService.Config, repo interfaces.Repository, producer *kafka.Producer, logger *logrus.Logger) interfaces.FanucService {
 	return &Service{
 		cfg:           cfg,
 		repo:          repo,
 		kafkaProducer: producer,
+		logger:        logger,
 	}
 }
 

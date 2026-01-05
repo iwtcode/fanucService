@@ -68,6 +68,10 @@ DB_NAME=fanuc_db
 # Kafka
 KAFKA_BROKER=localhost:9092
 KAFKA_TOPIC=fanuc_data
+
+# Logger
+ADAPTER_LOG_LEVEL=error
+SERVICE_LOG_LEVEL=info
 ```
 
 3️⃣ **Запуск Apache Kafka**

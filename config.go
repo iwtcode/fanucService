@@ -10,7 +10,7 @@ type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Kafka    KafkaConfig
-	Adapter  AdapterConfig
+	Logger   LoggerConfig
 }
 
 type AppConfig struct {
@@ -32,8 +32,9 @@ type KafkaConfig struct {
 	Topic  string
 }
 
-type AdapterConfig struct {
-	LogLevel string
+type LoggerConfig struct {
+	AdapterLevel string
+	ServiceLevel string
 }
 
 func LoadConfig() *Config {
@@ -56,8 +57,9 @@ func LoadConfig() *Config {
 			Broker: getEnv("KAFKA_BROKER"),
 			Topic:  getEnv("KAFKA_TOPIC"),
 		},
-		Adapter: AdapterConfig{
-			LogLevel: getEnv("ADAPTER_LOG_LEVEL", "info"),
+		Logger: LoggerConfig{
+			AdapterLevel: getEnv("ADAPTER_LOG_LEVEL", "info"),
+			ServiceLevel: getEnv("SERVICE_LOG_LEVEL", "info"),
 		},
 	}
 }

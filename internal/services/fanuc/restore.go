@@ -1,8 +1,6 @@
 package fanuc
 
 import (
-	"log"
-
 	adapter "github.com/iwtcode/fanucAdapter"
 	"github.com/iwtcode/fanucService/internal/domain/entities"
 )
@@ -13,11 +11,11 @@ func (s *Service) RestoreConnections() error {
 		return err
 	}
 
-	log.Printf("Restoring state for %d machines...", len(machines))
+	s.logger.Infof("Restoring state for %d machines...", len(machines))
 	go func() {
 		for _, m := range machines {
 			if m.Mode == entities.ModePolling {
-				log.Printf("Machine %s is in Polling mode. Starting polling routine...", m.ID)
+				s.logger.Infof("Machine %s is in Polling mode. Starting polling routine...", m.ID)
 				s.startPollingInternal(m.ID, m.Interval)
 				continue
 			}
@@ -31,7 +29,7 @@ func (s *Service) RestoreConnections() error {
 func (s *Service) checkOneOnce(machine entities.Machine) {
 	ip, port, err := parseEndpoint(machine.Endpoint)
 	if err != nil {
-		log.Printf("Invalid endpoint for machine %s: %v", machine.ID, err)
+		s.logger.Errorf("Invalid endpoint for machine %s: %v", machine.ID, err)
 		return
 	}
 
@@ -40,16 +38,17 @@ func (s *Service) checkOneOnce(machine entities.Machine) {
 		Port:        port,
 		TimeoutMs:   int32(machine.Timeout),
 		ModelSeries: machine.Series,
+		LogLevel:    s.cfg.Logger.AdapterLevel,
 	}
 
 	client, err := s.connectWithTimeout(cfg)
 
 	if err == nil {
 		s.clients.Store(machine.ID, client)
-		log.Printf("Restored connection to %s (Static mode)", machine.Endpoint)
+		s.logger.Infof("Restored connection to %s (Static mode)", machine.Endpoint)
 		s.updateStatus(&machine, entities.StatusConnected)
 	} else {
-		log.Printf("Machine %s (Static mode) is unreachable: %v", machine.Endpoint, err)
+		s.logger.Warnf("Machine %s (Static mode) is unreachable: %v", machine.Endpoint, err)
 		s.updateStatus(&machine, entities.StatusReconnecting)
 	}
 }
