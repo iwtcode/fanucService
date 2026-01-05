@@ -18,7 +18,7 @@
 - 🔐 **Безопасность**: Доступ к API защищен с помощью `X-API-Key`.
 - 🕹️ **Управляемый опрос**: Запуск и остановка мониторинга для каждого станка через API.
 - 💾 **Персистентность**: Состояния подключений сохраняются в PostgreSQL для автоматического восстановления после перезагрузки.
-- 🏭 **Fanuc Focas Integration**: Использование обертки над библиотой Fanuc (Fwlib).
+- 🏭 **Fanuc Focas Integration**: Использование обертки над библиотекой Fanuc (Fwlib).
 - 🐳 **Простота развертывания**: Готовая конфигурация docker-compose.
 
 ## 🏗️ Архитектура
@@ -85,6 +85,12 @@ docker compose up -d
 ```bash
 # Golang
 go run cmd/app/main.go
+```
+
+## 🧪 Тестирование
+
+```bash
+go test -v -count=1 ./tests
 ```
 
 ## 🔌 API
@@ -177,7 +183,7 @@ curl -X 'GET' \
 ## Получение конкретного подключения и проверка его актуальности
 
 ```http
-POST /api/v1/connect?id={uuid}
+GET /api/v1/connect?id={uuid}
 ```
 
 ```bash
@@ -254,6 +260,30 @@ curl -X 'POST' \
 }
 ```
 
+## Получение управляющей программы
+
+```http
+GET /api/v1/program?id={uuid}
+```
+
+```bash
+curl -X 'GET' \
+  'http://localhost:8080/api/v1/program?id=90e09ee9-7d39-4a15-8a00-b7fb351b27ee' \
+  -H 'accept: text/plain' \
+  -H 'X-API-Key: secret_key'
+```
+
+```gcode
+%
+O1(ROUGH)(TOOL=D12FEM) 
+T1M06
+G92X0.Y0.Z0. 
+G91G00X-33.023Y47.94 
+...
+M30
+%
+```
+
 ## Удаление подключения
 
 ```http
@@ -271,6 +301,58 @@ curl -X 'DELETE' \
 {
   "status": "ok",
   "message": "Session 90e09ee9-7d39-4a15-8a00-b7fb351b27ee successfully deleted"
+}
+```
+
+## 🛠️ Использование Go Client SDK
+
+### Установка
+
+```bash
+go get github.com/iwtcode/fanucService
+```
+
+### Пример использования
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	
+	"github.com/iwtcode/fanucService"
+)
+
+func main() {
+	// 1. Инициализация
+	client := fanucService.NewClient("http://localhost:8080", "secret_key")
+	ctx := context.Background()
+
+	// 2. Создание подключения
+	req := fanucService.ConnectionRequest{
+		Endpoint: "10.0.0.1:8193",
+		Timeout:  5000,
+		Model:    "FS0i-D",
+		Series:   "0i",
+	}
+	machine, err := client.CreateConnection(ctx, req)
+	if err != nil {
+		log.Fatalf("Ошибка подключения: %v", err)
+	}
+	fmt.Printf("ID станка: %s\n", machine.ID)
+
+	// 3. Получение программы
+	gcode, err := client.GetControlProgram(ctx, machine.ID)
+	if err != nil {
+		log.Printf("Ошибка получения программы: %v", err)
+	} else {
+		fmt.Printf("G-код:\n%s\n", gcode)
+	}
+
+	// 4. Управление опросом
+	_ = client.StartPolling(ctx, machine.ID, 2000)
 }
 ```
 

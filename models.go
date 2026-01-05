@@ -2,12 +2,23 @@ package fanucService
 
 import "time"
 
-// ConnectionRequest represents the payload to create a connection
+// ConnectionRequest payload to create a connection
 type ConnectionRequest struct {
 	Endpoint string `json:"endpoint" binding:"required"` // ip:port
 	Timeout  int    `json:"timeout"`                     // ms, default 5000
 	Model    string `json:"model"`                       // Human readable name, default "Unknown"
 	Series   string `json:"series"`                      // "0i", "31i", default "Unknown"
+}
+
+// StartPollingRequest payload to start polling
+type StartPollingRequest struct {
+	ID       string `json:"id" binding:"required"`
+	Interval int    `json:"interval"` // ms, default 10000
+}
+
+// StopPollingRequest payload to stop polling
+type StopPollingRequest struct {
+	ID string `json:"id" binding:"required"`
 }
 
 // ConnectionResponse represents a generic response wrapper
